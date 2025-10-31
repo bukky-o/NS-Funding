@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Nova Scotia – Charitable Funding Dashboard (Healthcare Consultancies)</title>
+  <style>
+    :root{
+      --bg:#0f172a; /* slate-900 */
+      --panel:#111827; /* gray-900 */
+      --muted:#94a3b8; /* slate-400 */
+      --text:#e5e7eb; /* gray-200 */
+      --accent:#22c55e; /* green-500 */
+      --accent-2:#38bdf8; /* sky-400 */
+      --warning:#f59e0b; /* amber-500 */
+      --danger:#ef4444; /* red-500 */
+      --ring: rgba(34,197,94,.35);
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:linear-gradient(180deg,#0b1223,#0f172a);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,Segoe UI Emoji,sans-serif}
+    header{position:sticky;top:0;background:linear-gradient(180deg,rgba(15,23,42,.95),rgba(15,23,42,.8));backdrop-filter:blur(10px);z-index:10;border-bottom:1px solid rgba(148,163,184,.15)}
+    .container{max-width:1200px;margin:0 auto;padding:18px}
+    h1{font-size:clamp(20px,2.8vw,34px);margin:6px 0 2px}
+    .sub{color:var(--muted);font-size:14px}
+    .toolbar{display:flex;gap:12px;flex-wrap:wrap;margin-top:14px}
+    input[type="search"], select, .btn{border:1px solid rgba(148,163,184,.25);background:#0b1223;color:var(--text);padding:10px 12px;border-radius:12px;outline:none}
+    input[type="search"]:focus, select:focus{box-shadow:0 0 0 4px var(--ring);border-color:var(--accent)}
+    .btn{cursor:pointer;transition:.2s ease;display:inline-flex;align-items:center;gap:8px}
+    .btn:hover{transform:translateY(-1px);}
+    .btn.primary{background:linear-gradient(180deg,#16a34a,#22c55e);border-color:transparent;color:white}
+    .btn.ghost{background:transparent}
+
+    .card{background:linear-gradient(180deg,rgba(17,24,39,.9),rgba(2,6,23,.8));border:1px solid rgba(148,163,184,.18);border-radius:16px;padding:14px}
+    table{width:100%;border-collapse:separate;border-spacing:0 10px}
+    thead th{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);text-align:left;padding:0 12px}
+    tbody tr{background:linear-gradient(180deg,rgba(2,6,23,.6),rgba(17,24,39,.7));border:1px solid rgba(148,163,184,.18)}
+    tbody td{padding:14px 12px;vertical-align:top}
+    tbody tr{border-radius:12px;overflow:hidden}
+    tbody tr td:first-child{border-top-left-radius:12px;border-bottom-left-radius:12px}
+    tbody tr td:last-child{border-top-right-radius:12px;border-bottom-right-radius:12px}
+
+    .org{font-weight:600}
+    .muted{color:var(--muted)}
+    .badge{display:inline-block;padding:4px 8px;border-radius:999px;border:1px solid rgba(148,163,184,.25);font-size:12px;margin:2px 6px 2px 0}
+    .status{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+    .tick{display:inline-flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid rgba(148,163,184,.25);background:#0b1223;border-radius:10px;cursor:pointer}
+    .tick input{appearance:none;width:16px;height:16px;border:2px solid rgba(148,163,184,.4);border-radius:6px;display:inline-block;position:relative}
+    .tick input:checked{border-color:var(--accent);background:var(--accent)}
+    .tick input:checked::after{content:"";position:absolute;inset:2px;background:white;clip-path:polygon(14% 44%,0 63%,45% 100%,100% 31%,81% 16%,46% 65%)}
+    .date{font-size:12px;color:var(--muted)}
+    .link{color:var(--accent-2);text-decoration:none}
+    .link:hover{text-decoration:underline}
+
+    details{margin-top:10px}
+    summary{cursor:pointer;color:var(--muted)}
+    form#addForm{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-top:12px}
+    form#addForm input, form#addForm textarea{width:100%;padding:10px;border-radius:10px;border:1px solid rgba(148,163,184,.25);background:#0b1223;color:var(--text)}
+    form#addForm button{grid-column:span 6}
+
+    @media (max-width:1000px){
+      .hide-lg{display:none}
+      form#addForm{grid-template-columns:1fr}
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="container">
+      <h1>Nova Scotia – Charitable Funding Dashboard</h1>
+      <div class="sub">Track funders relevant to health care consultancies. Tick <strong>Reviewed</strong>, <strong>Phoned</strong>, and <strong>Emailed</strong> – stamped with the date and saved automatically.</div>
+      <div class="toolbar">
+        <input id="search" type="search" placeholder="Search organisations, relationships, notes…" />
+        <select id="filterRel">
+          <option value="">Filter by relationship tag…</option>
+        </select>
+        <button id="exportBtn" class="btn ghost" title="Export your data as JSON">Export</button>
+        <button id="importBtn" class="btn ghost" title="Import JSON to restore/merge">Import</button>
+        <input id="importFile" type="file" accept="application/json" hidden />
+      </div>
+    </div>
+  </header>
+
+  <main class="container" style="margin-top:14px">
+    <div class="card">
+      <table id="fundersTable" aria-describedby="tableHelp">
+        <thead>
+          <tr>
+            <th>Organisation</th>
+            <th class="hide-lg">Website</th>
+            <th>Amount Range (CAD)</th>
+            <th>Phone</th>
+            <th>Relationships</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <p id="tableHelp" class="muted" style="margin:6px 12px 0">Tip: Click a tag to filter. Your progress is stored in your browser (localStorage).</p>
+      <details>
+        <summary>➕ Add another funding source</summary>
+        <form id="addForm">
+          <input name="name" placeholder="Organisation name" required />
+          <input name="website" placeholder="Website (https://…)" />
+          <input name="amount" placeholder="Amount range (e.g., $5,000–$25,000)" />
+          <input name="phone" placeholder="Phone (e.g., 902-555-1234)" />
+          <input name="relationships" placeholder="Tags (comma-separated)" />
+          <input name="notes" placeholder="Notes (shown on hover)" />
+          <button class="btn primary" type="submit">Add funder</button>
+        </form>
+      </details>
+    </div>
+  </main>
+
+<script>
+(function(){
+  const STORAGE_KEY = 'ns_funders_v1';
+  const STATUS_KEY = 'ns_funders_status_v1';
+
+  /** Seed data (you can edit/remove later). */
+  const seed = [
+    {
+      id: 'mental-health-foundation-ns',
+      name: 'Mental Health Foundation of Nova Scotia – Community Grants',
+      website: 'https://www.mentalhealthns.ca/grant-applications',
+      amount: '$1,000 – $25,000 (per project; bi-annual calls)',
+      phone: '902-464-6000',
+      relationships: ['mental health','province-wide','community projects'],
+      notes: 'Community-based mental health and addictions services and supports.'
+    },
+    {
+      id: 'community-foundation-ns-visions',
+      name: 'Community Foundation of Nova Scotia – VISIONS Fund',
+      website: 'https://cfns.ca/wp-content/uploads/2024/10/CFNS-VISIONS-Application.pdf',
+      amount: '$25,000 – $75,000 (grant range)',
+      phone: '902-490-9916',
+      relationships: ['community foundation','health & wellbeing','province-wide'],
+      notes: 'Grant range per 2024 application guide; amounts vary by CFNS fund.'
+    },
+    {
+      id: 'ns-chb-wellness-fund',
+      name: 'Nova Scotia Community Health Boards – Wellness Fund',
+      website: 'https://www.communityhealthboards.ns.ca/wellness-funds',
+      amount: '$500 – $3,500 (typical awards; up to $3,500)',
+      phone: 'Call/ text 211 or 1-855-466-4994',
+      relationships: ['population health','social determinants','local CHBs'],
+      notes: 'Funds local nonprofit/community projects addressing CHB plan priorities.'
+    },
+    {
+      id: 'medavie-foundation',
+      name: 'Medavie Foundation (Atlantic Canada focus)',
+      website: 'https://www.medavie.ca/en/medavie-foundation/',
+      amount: 'Varies (e.g., project grants commonly tens of thousands)',
+      phone: '506-867-4355',
+      relationships: ['healthy living','youth mental health','Atlantic Canada'],
+      notes: 'Private foundation funding initiatives with measurable health outcomes.'
+    },
+    {
+      id: 'iwk-foundation',
+      name: 'IWK Foundation (children, youth & women’s health)',
+      website: 'https://iwkfoundation.org/',
+      amount: 'Varies (supports IWK priorities; some internal grant programs via IWK Research)',
+      phone: '902-470-8085',
+      relationships: ['children & women’s health','Halifax','research & care'],
+      notes: 'Primarily supports IWK Health; explore TRIC and internal research calls if partnering.'
+    },
+    {
+      id: 'qeii-tric',
+      name: 'QEII Foundation – Translating Research Into Care (TRIC)',
+      website: 'https://innovationhub.nshealth.ca/grants-and-funding-opportunities/qeii-foundation-translating-research-care-tric-healthcare',
+      amount: 'Category 1: up to $100,000; Category 2: up to $50,000 (1–2 years)',
+      phone: '902-334-1546',
+      relationships: ['research & innovation','healthcare improvement','QEII'],
+      notes: 'Competitive grants supporting implementation of care improvements at Nova Scotia Health.'
+    },
+    {
+      id: 'qeii-patient-assistance-mental-health',
+      name: 'QEII Patient Assistance Grant – Mental Health (Cancer)',
+      website: 'https://qe2foundation.smapply.ca/prog/qeii_patient_assistance_grant_mental_health_for_cancer_patients/',
+      amount: 'Up to $1,000 (per eligible patient, annually)',
+      phone: '902-334-1546',
+      relationships: ['patient support','mental health','cancer','QEII'],
+      notes: 'Applied for by NS Health providers on behalf of QEII cancer patients to access mental health services.'
+    },
+    {
+      id: 'qeii-em-young-researcher',
+      name: 'QEII Foundation – Raymond L. Roberts Emergency Medicine Young Researcher’s Grant',
+      website: 'https://qe2foundation.ca/qeii-health-sciences-centre-staff/grants-health-centre-staff-physicians',
+      amount: 'Varies (supports early-career EM research)',
+      phone: '902-334-1546',
+      relationships: ['emergency medicine','research','QEII'],
+      notes: 'For new researchers or full-time staff working in emergency medicine at the QEII.'
+    },
+    {
+      id: 'dmrf',
+      name: 'Dalhousie Medical Research Foundation (DMRF)',
+      website: 'https://dmrf.ca',
+      amount: 'Varies (research and project funding via donor-supported programs)',
+      phone: '902-494-3502',
+      relationships: ['medical research','Dalhousie','Halifax'],
+      notes: 'Charitable foundation supporting health research at Dalhousie University and affiliated hospitals.'
+    },
+    {
+      id: 'heart-stroke-ns',
+      name: 'Heart & Stroke – Nova Scotia',
+      website: 'https://www.heartandstroke.ca/contact-us',
+      amount: 'Varies (national research & community funding; provincial engagement)',
+      phone: '1-888-473-4636',
+      relationships: ['cardiovascular','stroke','national charity','Nova Scotia'],
+      notes: 'National charity with NS presence; check current calls for community or research funding relevant to NS.'
+    },
+    {
+      id: 'canadian-cancer-society-ns',
+      name: 'Canadian Cancer Society – Nova Scotia',
+      website: 'https://cancer.ca/en/contact-us',
+      amount: 'Varies (research, community support; e.g., travel assistance programs)',
+      phone: '1-888-939-3333',
+      relationships: ['cancer','national charity','Nova Scotia'],
+      notes: 'National charity operating programs and funding; contact NS office for local opportunities.'
+    }
+  ];
+
+  const $tbody = document.querySelector('#fundersTable tbody');
+  const $search = document.querySelector('#search');
+  const $filterRel = document.querySelector('#filterRel');
+
+  function loadData(){
+    try{ return JSON.parse(localStorage.getItem(STORAGE_KEY)) || seed }catch{ return seed }
+  }
+  function saveData(data){ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)) }
+
+  function loadStatus(){
+    try{ return JSON.parse(localStorage.getItem(STATUS_KEY)) || {} }catch{ return {} }
+  }
+  function saveStatus(status){ localStorage.setItem(STATUS_KEY, JSON.stringify(status)) }
+
+  let data = loadData();
+  let status = loadStatus();
+
+  function uniqTags(){
+    const all = new Set();
+    data.forEach(d => (d.relationships||[]).forEach(t=>all.add(t)));
+    return Array.from(all).sort((a,b)=>a.localeCompare(b));
+  }
+
+  function slug(s){ return (s||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'') }
+
+  function render(){
+    const q = ($search.value||'').toLowerCase();
+    const tag = $filterRel.value;
+
+    $tbody.innerHTML = '';
+
+    data
+      .filter(row => !q || JSON.stringify(row).toLowerCase().includes(q))
+      .filter(row => !tag || (row.relationships||[]).includes(tag))
+      .forEach(row => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>
+            <div class="org" title="${row.notes||''}">${row.name}</div>
+            <div class="hide-lg"><a class="link" href="${row.website||'#'}" target="_blank" rel="noopener">${row.website||''}</a></div>
+          </td>
+          <td class="hide-lg"></td>
+          <td>${row.amount||''}</td>
+          <td><a class="link" href="tel:${(row.phone||'').replace(/[^+0-9]/g,'')}">${row.phone||''}</a></td>
+          <td>
+            ${(row.relationships||[]).map(t=>`<span class="badge" data-tag="${t}">${t}</span>`).join('')}
+          </td>
+          <td>
+            <div class="status" data-id="${row.id||slug(row.name)}">
+              ${['Reviewed','Phoned','Emailed'].map(label => {
+                const key = label.toLowerCase();
+                const rowStatus = status[row.id||slug(row.name)] || {};
+                const checked = rowStatus[key]?.checked ? 'checked' : '';
+                const date = rowStatus[key]?.date || '';
+                return `
+                  <label class="tick" title="Mark as ${label.toLowerCase()}">
+                    <input type="checkbox" data-action="tick" data-kind="${key}" ${checked} />
+                    <span>${label}</span>
+                    <span class="date" data-date-for="${key}">${date?`· ${date}`:''}</span>
+                  </label>
+                `
+              }).join('')}
+            </div>
+          </td>
+        `;
+        $tbody.appendChild(tr);
+      });
+
+    // Click-to-filter on tags
+    $tbody.querySelectorAll('.badge').forEach(el=>{
+      el.addEventListener('click',()=>{
+        $filterRel.value = el.dataset.tag;
+        render();
+      })
+    });
+
+    // Wire up ticks
+    $tbody.querySelectorAll('[data-action="tick"]').forEach(cb=>{
+      cb.addEventListener('change', (e)=>{
+        const container = e.target.closest('.status');
+        const id = container?.dataset.id;
+        const kind = e.target.dataset.kind;
+        if(!id||!kind) return;
+        status[id] = status[id] || {};
+        const now = new Date();
+        const stamp = new Intl.DateTimeFormat(undefined, { year:'numeric', month:'short', day:'2-digit'}).format(now);
+        status[id][kind] = { checked: e.target.checked, date: e.target.checked ? stamp : '' };
+        // Update UI date next to this tick only
+        const dateSpan = container.querySelector(`[data-date-for="${kind}"]`);
+        dateSpan.textContent = e.target.checked ? `· ${stamp}` : '';
+        saveStatus(status);
+      })
+    })
+  }
+
+  // Populate filter options
+  function renderTagFilter(){
+    const tags = uniqTags();
+    $filterRel.innerHTML = '<option value="">Filter by relationship tag…</option>' + tags.map(t=>`<option>${t}</option>`).join('');
+  }
+
+  // Search and filter handlers
+  $search.addEventListener('input', render);
+  $filterRel.addEventListener('change', render);
+
+  // Add new funder
+  document.getElementById('addForm').addEventListener('submit', (e)=>{
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const row = Object.fromEntries(fd.entries());
+    const id = slug(row.name);
+    const newRow = {
+      id,
+      name: row.name.trim(),
+      website: (row.website||'').trim(),
+      amount: (row.amount||'').trim(),
+      phone: (row.phone||'').trim(),
+      relationships: (row.relationships||'').split(',').map(s=>s.trim()).filter(Boolean),
+      notes: (row.notes||'').trim()
+    };
+    data.push(newRow);
+    saveData(data);
+    renderTagFilter();
+    render();
+    e.target.reset();
+  })
+
+  // Export / Import
+  document.getElementById('exportBtn').addEventListener('click', ()=>{
+    const blob = new Blob([JSON.stringify({data, status}, null, 2)], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = Object.assign(document.createElement('a'), {href:url, download:'ns-health-funders.json'});
+    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+  })
+  const $importFile = document.getElementById('importFile');
+  document.getElementById('importBtn').addEventListener('click', ()=> $importFile.click());
+  $importFile.addEventListener('change', async (e)=>{
+    const file = e.target.files?.[0]; if(!file) return;
+    try{
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+      if(parsed.data && Array.isArray(parsed.data)) data = parsed.data;
+      if(parsed.status && typeof parsed.status === 'object') status = parsed.status;
+      saveData(data); saveStatus(status);
+      renderTagFilter(); render();
+      alert('Import complete.');
+    }catch(err){ alert('Could not import this file. Is it valid JSON?'); }
+    e.target.value = '';
+  })
+
+  // Boot
+  renderTagFilter();
+  render();
+})();
+</script>
+</body>
+</html>
